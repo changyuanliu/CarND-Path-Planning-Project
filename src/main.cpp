@@ -55,7 +55,7 @@ int main() {
   int lane = 1;
 
   // Have a reference velocity to target
-  double ref_vel = 49.5; //unit: mph
+  double ref_vel = 49.0; //unit: mph
 
   h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,
                &map_waypoints_dx,&map_waypoints_dy,&lane,&ref_vel]
@@ -132,7 +132,7 @@ int main() {
 
             double ref_x_prev = previous_path_x[prev_size-2];
             double ref_y_prev = previous_path_y[prev_size-2];
-            ref_yaw = atan2(ref_y-ref_y_prev,ref_x-ref_x_prev);
+            ref_yaw = atan2(ref_y - ref_y_prev, ref_x - ref_x_prev);
 
             // use two points that make the path tangent to the previous path's end point
             ptsx.push_back(ref_x_prev);
@@ -158,18 +158,18 @@ int main() {
           for (int i = 0; i < ptsx.size(); ++i) 
           {
             // Shift car reference angle to 0 degrees
-            double shift_x = ptsx[i]-ref_x;
-            double shift_y = ptsy[i]-ref_y;
-
-            ptsx[i] = (shift_x*cos(0-ref_yaw)-shift_y*sin(0-ref_yaw));
-            ptsy[i] = (shift_x*sin(0-ref_yaw)-shift_y*cos(0-ref_yaw));
+            double shift_x = ptsx[i] - ref_x;
+            double shift_y = ptsy[i] - ref_y;
+            // Transform to local cordinates
+            ptsx[i] = (shift_x * cos(0 - ref_yaw) - shift_y * sin(0 - ref_yaw));
+            ptsy[i] = (shift_x * sin(0 - ref_yaw) + shift_y * cos(0 - ref_yaw));
           }
 
           // Create a spline
           tk::spline spl;
 
           // Set (x,y) points to the spline
-          spl.set_points(ptsx,ptsy);
+          spl.set_points(ptsx, ptsy);
 
           // Define the actual (x,y) points used for the planner
           vector<double> next_x_vals;
@@ -185,15 +185,15 @@ int main() {
           // Calculate how to break up spline points so that we travel at the desired reference velocity
           double target_x = 30.0;
           double target_y = spl(target_x);
-          double target_dist = sqrt(target_x*target_x+target_y*target_y);
+          double target_dist = sqrt(target_x * target_x + target_y * target_y);
 
           double x_add_on = 0;
 
           // Fill up the rest of our path planner after filling it with previous points, here we will always output 50 points
-          for (int i = 1; i <= 50-previous_path_x.size(); ++i)
+          for (int i = 1; i <= (50 - previous_path_x.size()); i++)
           {
-            double N = target_dist/(0.02*ref_vel/2.24);
-            double x_point = x_add_on + target_x/N;
+            double N = target_dist / (0.02 * ref_vel / 2.24);
+            double x_point = x_add_on + (target_x / N);
             double y_point = spl(x_point);
 
             x_add_on = x_point;
@@ -202,8 +202,8 @@ int main() {
             double y_r = y_point;
 
             // Rotate back to normal
-            x_point = (x_r*cos(ref_yaw)-y_r*sin(ref_yaw));
-            y_point = (x_r*sin(ref_yaw)+y_r*cos(ref_yaw));
+            x_point = (x_r * cos(ref_yaw) - y_r * sin(ref_yaw));
+            y_point = (x_r * sin(ref_yaw) + y_r * cos(ref_yaw));
 
             x_point += ref_x;
             y_point += ref_y;
