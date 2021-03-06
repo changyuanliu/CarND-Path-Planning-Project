@@ -111,11 +111,11 @@ int main() {
           bool too_close = false;
 
           // Find rev_v to use
-          for(int i = 0; i < sensor_fusion.size(); ++i)
+          for(int i = 0; i < sensor_fusion.size(); i++)
           {
             // Car is in my lane
             float d = sensor_fusion[i][6];
-            if(d > (2 + 4*lane - 2) && d < (2 + 4*lane + 2))
+            if((d < (2 + 4*lane + 2)) && (d > (2 + 4*lane - 2)))
             {
               double vx = sensor_fusion[i][3];
               double vy = sensor_fusion[i][4];
@@ -130,16 +130,13 @@ int main() {
             }
           }
 
-          if(too_close)
+          if(too_close || (ref_vel >= 49.5))
           {
             ref_vel -= 0.224;            
           }
           else 
           {
-            if(ref_vel < 49.5)
-            {
-                ref_vel += 0.224;             
-            }
+            ref_vel += 0.224;             
           }
 
           // Create a list of widely spaced (x,y) waypoints, evenly spaced at 30m
@@ -197,7 +194,7 @@ int main() {
           ptsy.push_back(next_wp1[1]);
           ptsy.push_back(next_wp2[1]);
 
-          for (int i = 0; i < ptsx.size(); ++i) 
+          for (int i = 0; i < ptsx.size(); i++) 
           {
             // Shift car reference angle to 0 degrees
             double shift_x = ptsx[i] - ref_x;
@@ -218,7 +215,7 @@ int main() {
           vector<double> next_y_vals;
 
           // Start with all of the previous path points from last time
-          for(int i = 0; i < previous_path_x.size(); ++i)
+          for(int i = 0; i < previous_path_x.size(); i++)
           {
             next_x_vals.push_back(previous_path_x[i]);
             next_y_vals.push_back(previous_path_y[i]);
@@ -232,7 +229,7 @@ int main() {
           double x_add_on = 0;
 
           // Fill up the rest of our path planner after filling it with previous points, here we will always output 50 points
-          for (int i = 1; i <= (50 - previous_path_x.size()); ++i)
+          for (int i = 1; i <= (50 - previous_path_x.size()); i++)
           {
             double N = target_dist / (0.02 * ref_vel / 2.24);
             double x_point = x_add_on + (target_x / N);
