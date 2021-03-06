@@ -51,20 +51,20 @@ int main() {
     map_waypoints_dy.push_back(d_y);
   }
 
+  // Start in lane 1
+  int lane = 1;
+
+  // Have a reference velocity to target
+  double ref_vel = 49.5; //unit: mph
+
   h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,
-               &map_waypoints_dx,&map_waypoints_dy]
+               &map_waypoints_dx,&map_waypoints_dy,&lane,&ref_vel]
               (uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
 
-    // Start in lane 1
-    int lane = 1;
-
-    // Have a reference velocity to target
-    double ref_vel = 49.5; //unit: mph
-    
     if (length && length > 2 && data[0] == '4' && data[1] == '2') {
 
       auto s = hasData(data);
@@ -96,22 +96,22 @@ int main() {
           //   of the road.
           auto sensor_fusion = j[1]["sensor_fusion"];
 
-          int prev_size = previous_path_x.size();
-
-          json msgJson;
 
           /**
            * TODO: define a path made up of (x,y) points that the car will visit
            *   sequentially every .02 seconds
            */
+          int prev_size = previous_path_x.size();          
 
           vector<double> ptsx;
           vector<double> ptsy;
-
-          double ref_x = car_s;
+          // reference x, y, yaw states
+          // either we will reference the watrting point as where the car is or the previous path end point
+          double ref_x = car_x;
           double ref_y = car_y;
           double ref_yaw = deg2rad(car_yaw);
 
+          // if previous size is almost empty, use the car as starting reference
           if(prev_size < 2)
           {
             double prev_car_x = car_x - cos(car_yaw);
@@ -123,8 +123,10 @@ int main() {
             ptsy.push_back(prev_car_y);
             ptsy.push_back(car_y);
           }
+          // use the previous path's end point as starting reference
           else
           {
+            // redefine reference state as previous path end point
             ref_x = previous_path_x[prev_size-1];
             ref_y = previous_path_y[prev_size-1];
 
@@ -132,6 +134,7 @@ int main() {
             double ref_y_prev = previous_path_y[prev_size-2];
             ref_yaw = atan2(ref_y-ref_y_prev,ref_x-ref_x_prev);
 
+            // use two points that make the path tangent to the previous path's end point
             ptsx.push_back(ref_x_prev);
             ptsx.push_back(ref_x);
 
@@ -139,6 +142,7 @@ int main() {
             ptsy.push_back(ref_y);
           }
 
+          // in Frenet add evenly 30m spaced points ahead of the starting reference
           vector<double> next_wp0 = getXY(car_s+30, 2+4*lane, map_waypoints_s, map_waypoints_x, map_waypoints_y);
           vector<double> next_wp1 = getXY(car_s+60, 2+4*lane, map_waypoints_s, map_waypoints_x, map_waypoints_y);
           vector<double> next_wp2 = getXY(car_s+90, 2+4*lane, map_waypoints_s, map_waypoints_x, map_waypoints_y);
@@ -151,7 +155,9 @@ int main() {
           ptsy.push_back(next_wp1[1]);
           ptsy.push_back(next_wp2[1]);
 
-          for (int i = 0; i < ptsx.size(); ++i) {
+          for (int i = 0; i < ptsx.size(); ++i) 
+          {
+            // Shift car reference angle to 0 degrees
             double shift_x = ptsx[i]-ref_x;
             double shift_y = ptsy[i]-ref_y;
 
@@ -160,10 +166,10 @@ int main() {
           }
 
           // Create a spline
-          tk::spline s;
+          tk::spline spl;
 
           // Set (x,y) points to the spline
-          s.set_points(ptsx,ptsy);
+          spl.set_points(ptsx,ptsy);
 
           // Define the actual (x,y) points used for the planner
           vector<double> next_x_vals;
@@ -178,7 +184,7 @@ int main() {
 
           // Calculate how to break up spline points so that we travel at the desired reference velocity
           double target_x = 30.0;
-          double target_y = s(target_x);
+          double target_y = spl(target_x);
           double target_dist = sqrt(target_x*target_x+target_y*target_y);
 
           double x_add_on = 0;
@@ -188,16 +194,16 @@ int main() {
           {
             double N = target_dist/(0.02*ref_vel/2.24);
             double x_point = x_add_on + target_x/N;
-            double y_point = s(x_point);
+            double y_point = spl(x_point);
 
             x_add_on = x_point;
 
-            double x_ref = x_point;
-            double y_ref = y_point;
+            double x_r = x_point;
+            double y_r = y_point;
 
             // Rotate back to normal
-            x_point = (x_ref*cos(ref_yaw)-y_ref*sin(ref_yaw));
-            y_point = (x_ref*sin(ref_yaw)+y_ref*cos(ref_yaw));
+            x_point = (x_r*cos(ref_yaw)-y_r*sin(ref_yaw));
+            y_point = (x_r*sin(ref_yaw)+y_r*cos(ref_yaw));
 
             x_point += ref_x;
             y_point += ref_y;
@@ -209,7 +215,8 @@ int main() {
 
 
           //END
-
+          
+          json msgJson;
           msgJson["next_x"] = next_x_vals;
           msgJson["next_y"] = next_y_vals;
 
