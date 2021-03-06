@@ -110,7 +110,7 @@ int main() {
 
           bool too_close = false;
 
-          // Find rev_v to use
+          // Find ref_vel to use
           for(int i = 0; i < sensor_fusion.size(); i++)
           {
             // Car is in my lane
@@ -122,19 +122,19 @@ int main() {
               double check_speed = sqrt(vx*vx + vy*vy);
               double check_car_s = sensor_fusion[i][5];
 
-              check_car_s += (double) (prev_size * 0.02 * check_speed);
+              check_car_s += ((double)prev_size * 0.02 * check_speed);
               if((check_car_s > car_s) && ((check_car_s - car_s) < 30))
               {
                 too_close = true;
               }
-            }
+            }          
           }
 
-          if(too_close || (ref_vel >= 49.5))
+          if(too_close)
           {
             ref_vel -= 0.224;            
           }
-          else 
+          else if(ref_vel < 49.5)
           {
             ref_vel += 0.224;             
           }
