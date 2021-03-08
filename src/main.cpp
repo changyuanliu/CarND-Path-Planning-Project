@@ -175,7 +175,7 @@ int main() {
           }
 
           // Create a list of widely spaced (x,y) waypoints, evenly spaced at 30m
-          // Later we will interoplate these waypoints with a spline 
+          // Later we will interpolate these waypoints with a spline 
           // and fill it in with more points that control speed.
           vector<double> ptsx;
           vector<double> ptsy;
