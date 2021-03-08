@@ -23,6 +23,13 @@ int main() {
   vector<double> map_waypoints_s;
   vector<double> map_waypoints_dx;
   vector<double> map_waypoints_dy;
+  
+  // Constants
+  static const float MAX_VEL = 49.5; // unit: mph
+  static const float MAX_ACC = 10.0; // unit: m/s^2
+  static const float MAX_JERK = 10.0; // unit: m/s^3
+  static const float MPH_TO_MPS = 0.44704; // conversion factor from mph to meter per second
+  static const float TS = 0.02; // time interval, nit: second
 
   // Waypoint map to read from
   string map_file_ = "../data/highway_map.csv";
@@ -96,7 +103,6 @@ int main() {
           //   of the road.
           auto sensor_fusion = j[1]["sensor_fusion"];
 
-
           /**
            * TODO: define a path made up of (x,y) points that the car will visit
            *   sequentially every .02 seconds
@@ -108,39 +114,64 @@ int main() {
             car_s = end_path_s;
           }
 
-          bool too_close = false;
+          bool car_ahead = false;
+          bool left_lane_ok = true;
+          bool right_lane_ok = true;
 
           // Find ref_vel to use
           for(int i = 0; i < sensor_fusion.size(); i++)
           {
-            // Car is in my lane
+            
             float d = sensor_fusion[i][6];
+            double vx = sensor_fusion[i][3];
+            double vy = sensor_fusion[i][4];
+            double check_speed = sqrt(vx*vx + vy*vy);
+            double check_car_s = sensor_fusion[i][5];
+
+            check_car_s += ((double)prev_size * TS * check_speed);            
+            // Car is in my lane
             if((d < (2 + 4*lane + 2)) && (d > (2 + 4*lane - 2)))
             {
-              double vx = sensor_fusion[i][3];
-              double vy = sensor_fusion[i][4];
-              double check_speed = sqrt(vx*vx + vy*vy);
-              double check_car_s = sensor_fusion[i][5];
-
-              check_car_s += ((double)prev_size * 0.02 * check_speed);
+              // If there is a car in the 30 m range ahead
               if((check_car_s > car_s) && ((check_car_s - car_s) < 30))
               {
-                too_close = true;
-                if(lane >0)
-                {
-                  lane = 0;
-                }
+                car_ahead = true;
               }
-            }          
+            }            
+            else if((d < (2 + 4*(lane-1) + 2)) && (d > (2 + 4*(lane-1) - 2))) // left lane
+            {
+              // If any car in the left lane is in the range of [-15, 30], it shouldn't change to left lane
+              if(((check_car_s - car_s) <= 30) && ((check_car_s - car_s) >= -15))
+              {
+                left_lane_ok = false;
+              }
+            }
+            else //right lane
+            {
+              // If any car in the right lane is in the range of [-15, 30], it shouldn't change to right lane
+              if(((check_car_s - car_s) <= 30) && ((check_car_s - car_s) >= -15))
+              {
+                right_lane_ok = false;
+              }
+            }                     
           }
 
-          if(too_close)
+          float delta_vel = (6/MPH_TO_MPS)*TS;    // unit: mph
+          if(car_ahead)
           {
-            ref_vel -= 0.224;            
+            ref_vel -= delta_vel;
+            if(left_lane_ok && lane >= 1)
+            {
+              lane -= 1;            
+            }
+            else if(right_lane_ok && lane <= 1)
+            {
+              lane += 1;
+            }
           }
-          else if(ref_vel < 49.5)
+          else if(ref_vel <= MAX_VEL)
           {
-            ref_vel += 0.224;             
+            ref_vel += delta_vel;             
           }
 
           // Create a list of widely spaced (x,y) waypoints, evenly spaced at 30m
@@ -235,7 +266,7 @@ int main() {
           // Fill up the rest of our path planner after filling it with previous points, here we will always output 50 points
           for (int i = 1; i <= (50 - previous_path_x.size()); i++)
           {
-            double N = target_dist / (0.02 * ref_vel / 2.24);
+            double N = target_dist / (TS * ref_vel * MPH_TO_MPS);
             double x_point = x_add_on + (target_x / N);
             double y_point = spl(x_point);
 
